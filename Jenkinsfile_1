@@ -1,0 +1,152 @@
+pipeline {
+    agent any
+    tools {
+        nodejs 'NodeJS'
+    }
+    environment {
+        SCANNER_HOME = tool 'sonar-scanner'
+        DOCKERHUB_CREDENTIALS = credentials('Docker_hub')
+    }
+    stages {
+        stage('Clean workspace') {
+            steps {
+                cleanWs()
+            }
+        }
+        stage('Checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/Temilolagit/reddit-clone-k8s.git'
+            }
+        }
+        stage('SonarQube Analysis') {
+            steps {
+                // Add withSonarQubeEnv wrapper
+                withSonarQubeEnv('sonar-server') {
+                    sh "$SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=reddit-clone -Dsonar.projectKey=reddit-clone"
+                }
+            }
+        }
+        stage('Quality Gate') {
+            steps {
+                script {
+                   waitForQualityGate abortPipeline: false, credentialsId: 'Sonar_Token'
+                }
+            }
+        }
+        stage('NPM') {
+            steps {
+                sh 'npm install'
+            }
+        }
+        stage('Trivy File Scan') {
+            steps {
+                script {
+                    sh '/usr/local/bin/trivy fs . > trivy_result.txt'
+                }
+            }
+        }
+        stage('OWASP Security Testing') {
+            steps {
+                script {
+                     dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit --nvdApiKey 4bdf4acc-8eae-45c1-bfc4-844d549be812', odcInstallation: 'DP'
+                     dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
+                }
+            }
+        }
+        stage('Login to DockerHUB') {
+            steps {
+                script {
+                   sh "echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin"
+                    echo 'Login Succeeded'
+                }
+            }
+        }
+        stage('Docker Build') {
+            steps {
+                script {
+                    sh 'docker build -t temiloladocker/reddit-clone-k8s:latest .'
+                    echo "Image Build Successfully"
+                }
+            }
+        }
+        stage('Trivy Image Scan') {
+            steps {
+                script {
+                    sh '/usr/local/bin/trivy image temiloladocker/reddit-clone-k8s:latest > trivy_image_result.txt'
+                    sh 'pwd'
+                }
+            }
+        }
+        stage('Docker Push') {
+            steps {
+                script {
+                    sh 'docker push temiloladocker/reddit-clone-k8s:latest'
+                    echo "Push Image to Registry"
+                }
+            }
+        }
+        stage('Containerization Deployment') {
+            steps {
+                script {
+                    def containername = 'reddit-clone-k8s'
+                    def isRunning = sh(script: "docker ps -a | grep ${containername}", returnStatus: true)
+                    if (isRunning == 0) {
+                        sh "docker stop ${containername}"
+                        sh "docker rm ${containername}"
+                    }
+                    sh "docker run -d -p 3000:3000 --name ${containername} temiloladocker/reddit-clone-k8s:latest"
+                }                    
+            }
+        }
+        stage('Deploy to Kubernetes') {
+            steps {
+                script {
+                    // Deploy to Kubernetes
+                    sh 'curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl'
+                    sh 'chmod +x ./kubectl'
+                    sh 'sudo mv ./kubectl /usr/local/bin/kubectl'
+
+                    // Authenticate with AWS (if necessary)
+                    // sh 'aws configure set aws_access_key_id <your-access-key>'
+                    // sh 'aws configure set aws_secret_access_key <your-secret-key>'
+                    
+                    // Configure kubectl
+                    sh 'kops export kubecfg --name demo.k8s.lola.net --state s3://demo.k8s.lola.net
+'
+
+                    // Apply Kubernetes deployment YAML
+                    sh 'kubectl apply -f deployment.yaml'
+
+                    // Wait for deployment to finish
+                    sh 'kubectl rollout status -f deployment.yaml'
+                }
+            }
+        }
+
+        stage('Cluster Scan') {
+            steps {
+                script {
+                    sh 'curl -LO https://github.com/aquasecurity/kube-bench/releases/download/v0.6.3/kube-bench_0.6.3_linux_amd64.tar.gz'
+                    sh 'tar xzf kube-bench_0.6.3_linux_amd64.tar.gz'
+                    sh 'cd kube-bench_0.6.3_linux_amd64'
+
+                    // Run kube-bench
+                    sh './kube-bench --version'
+                    sh './kube-bench run --targets node,controlplane,master,worker'
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Pipeline succeeded! Deployed to Kubernetes.'
+            // You can add notifications or further actions here upon success
+        }
+        failure {
+            echo 'Pipeline failed! Check logs for details.'
+            // You can add notifications or further actions here upon failure
+        }
+    }
+}
+    
