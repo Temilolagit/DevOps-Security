@@ -22,7 +22,7 @@ pipeline {
     }
   stage('Docker Build and Push') {
       steps {
-        withDockerRegistry([credentialsId: "Docker", url: ""]) {
+        withDockerRegistry([credentialsId: "Docker_hub", url: ""]) {
           sh 'printenv'
           sh 'docker build -t Temiloladocker/numeric-app:v1 .'
           sh 'docker push Temiloladocker/numeric-app:v1'
