@@ -32,7 +32,7 @@ pipeline {
   stage('Kubernetes Deployment - DEV') {
       steps {
         withKubeConfig([credentialsId: 'kubeconfig']) {
-          sh "sed -i 'temiloladocker/numeric-app:v1' k8s_deployment_service.yaml"
+          sh "sed -i 's#replace#temiloladocker/numeric-app:v1#g' k8s_deployment_service.yaml"
           sh "kubectl apply -f k8s_deployment_service.yaml"
         }
       }
