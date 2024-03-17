@@ -50,7 +50,7 @@ pipeline {
       steps {
         withDockerRegistry([credentialsId: "Docker_hub", url: ""]) {
           sh 'printenv'
-          sh 'sudo docker build -t temiloladocker/numeric-app:v1 .'
+          sh 'docker build -t temiloladocker/numeric-app:v1 .'
           sh 'docker push temiloladocker/numeric-app:v1'
         }
       }
@@ -58,8 +58,8 @@ pipeline {
   stage('Kubernetes Deployment - DEV') {
       steps {
         withKubeConfig([credentialsId: 'kubeconfig']) {
-         // sh "sed -i 's#replace#temiloladocker/numeric-app:v1#g' k8s_deployment_service.yaml"
-          //sh "kubectl apply -f k8s_deployment_service.yaml"
+          sh "sed -i 's#replace#temiloladocker/numeric-app:v1#g' k8s_deployment_service.yaml"
+          sh "kubectl apply -f k8s_deployment_service.yaml"
         }
       }
     }
