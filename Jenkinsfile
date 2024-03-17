@@ -50,7 +50,7 @@ pipeline {
       steps {
         withDockerRegistry([credentialsId: "Docker_hub", url: ""]) {
           sh 'printenv'
-          sh 'docker build -t temiloladocker/numeric-app:v1 .'
+          sh 'sudo docker build -t temiloladocker/numeric-app:v1 .'
           sh 'docker push temiloladocker/numeric-app:v1'
         }
       }
