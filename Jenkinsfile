@@ -44,6 +44,17 @@ pipeline {
         }
       }
     }
+  stage('Vulnerability Scan - Docker ') {
+      steps {
+        sh "mvn dependency-check:check"
+      }
+      post {
+        always {
+          dependencyCheckPublisher pattern: 'target/dependency-check-report.xml'
+        }
+      }
+    }
+
   stage('Docker Build and Push') {
       steps {
         withDockerRegistry([credentialsId: "Docker_hub", url: ""]) {
@@ -56,8 +67,8 @@ pipeline {
   stage('Kubernetes Deployment - DEV') {
       steps {
         withKubeConfig([credentialsId: 'kubeconfig']) {
-          sh "sed -i 's#replace#temiloladocker/numeric-app:v1#g' k8s_deployment_service.yaml"
-          sh "kubectl apply -f k8s_deployment_service.yaml"
+         // sh "sed -i 's#replace#temiloladocker/numeric-app:v1#g' k8s_deployment_service.yaml"
+          //sh "kubectl apply -f k8s_deployment_service.yaml"
         }
       }
     }
