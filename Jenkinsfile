@@ -1,7 +1,14 @@
 pipeline {
   agent any
+  environment {
+    deploymentName = "devsecops"
+    containerName = "devsecops-container"
+    serviceName = "devsecops-svc"
+    imageName = "temiloladocker/numeric-app:v1"
+    applicationURI = "/increment/99"
+  }
 
-  stages {
+  stages{
       stage('Build Artifact') {
             steps {
               sh "mvn clean package -DskipTests=true"
@@ -68,15 +75,32 @@ pipeline {
     }
   }
 
-  stage('Kubernetes Deployment - DEV') {
+  //stage('Kubernetes Deployment - DEV') {
+     // steps {
+      //  withKubeConfig([credentialsId: 'kubeconfig']) {
+        //  sh "sed -i 's#replace#temiloladocker/numeric-app:v1#g' k8s_deployment_service.yaml"
+        //  sh "kubectl apply -f k8s_deployment_service.yaml"
+  //}
+     // }
+ // }
+  
+  stage('K8S Deployment - DEV') {
       steps {
-        withKubeConfig([credentialsId: 'kubeconfig']) {
-          sh "sed -i 's#replace#temiloladocker/numeric-app:v1#g' k8s_deployment_service.yaml"
-          sh "kubectl apply -f k8s_deployment_service.yaml"
-        }
+        parallel(
+          "Deployment": {
+            withKubeConfig([credentialsId: 'kubeconfig']) {
+              sh "bash k8s-deployment.sh"
+            }
+          },
+          "Rollout Status": {
+            withKubeConfig([credentialsId: 'kubeconfig']) {
+              sh "bash k8s-deployment-rollout-status.sh"
+            }
+          }
+        )
       }
     }
-}
+  }
   post {
     always {
       junit 'target/surefire-reports/*.xml'
