@@ -35,26 +35,34 @@ pipeline {
     }
   stage('Vulnerability Scan - Docker ') {
       steps {
-        parallel(
-          "Dependency Scan": {
             sh "mvn dependency-check:check"
-          },
-          "Trivy Scan": {
-            sh "bash trivy-docker-image-scan.sh"
           }
-        )
       }
-    }
+    
 
   stage('Docker Build and Push') {
       steps {
-        withDockerRegistry([credentialsId: "Docker_hub", url: ""]) {
-          sh 'printenv'
           sh 'docker build -t temiloladocker/numeric-app:v1 .'
-          sh 'docker push temiloladocker/numeric-app:v1'
         }
       }
+    
+  stage('Trivy Image Scan') {
+      steps {
+            sh "/usr/local/bin/trivy image temiloladocker/numeric-app:v1 > trivy_image_result.txt"
+            sh "pwd"
+         }
+     }
+  stage('Docker Push') {
+      steps {
+        withDockerRegistry([credentialsId: "Docker_hub", url: ""]) {
+          script {
+              sh 'docker push temiloladocker/numeric-app:v1'
+               echo "Push Image to Registry"
+          }
+      }
     }
+  }
+
   stage('Kubernetes Deployment - DEV') {
       steps {
         withKubeConfig([credentialsId: 'kubeconfig']) {
@@ -63,8 +71,7 @@ pipeline {
         }
       }
     }
-    
-  }
+}
   post {
     always {
       junit 'target/surefire-reports/*.xml'
@@ -81,7 +88,7 @@ pipeline {
 
     // }
   }
-
 }
+
   
 
