@@ -49,7 +49,6 @@ pipeline {
   stage('Trivy Image Scan') {
       steps {
             sh "/usr/local/bin/trivy image temiloladocker/numeric-app:v1 > trivy_image_result.txt"
-            sh "pwd"
          }
      }
   stage('OPA') {
