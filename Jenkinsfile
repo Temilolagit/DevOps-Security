@@ -52,7 +52,7 @@ pipeline {
             sh "pwd"
          }
      }
-  stage('Trivy Image Scan') {
+  stage('OPA') {
       steps {
             sh 'docker run --rm -v $(pwd):/project openpolicyagent/conftest test --policy opa-docker-security.rego Dockerfile'
          }
