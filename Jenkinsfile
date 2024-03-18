@@ -52,6 +52,12 @@ pipeline {
             sh "pwd"
          }
      }
+  stage('Trivy Image Scan') {
+      steps {
+            sh 'docker run --rm -v $(pwd):/project openpolicyagent/conftest test --policy opa-docker-security.rego Dockerfile'
+         }
+     }
+
   stage('Docker Push') {
       steps {
         withDockerRegistry([credentialsId: "Docker_hub", url: ""]) {
